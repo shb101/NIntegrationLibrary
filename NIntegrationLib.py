@@ -6,8 +6,7 @@ engine = ctypes.cdll.LoadLibrary('NIntegrationEngine.dll')
 
 def NIntTrapz(func, x0, x1, N):
     dx = (x1-x0)/N
-    F = [func(x0+i*dx) for i in range(N+1)]
-    c_F = (ctypes.c_double * (N+1))(*F)
+    c_F = (ctypes.c_double * (N+1))(*[func(x0+i*dx) for i in range(N+1)])
     engine.NIntTrapz.restype = ctypes.c_double
     I = engine.NIntTrapz(ctypes.c_double(x0), ctypes.c_double(x1), c_F, ctypes.c_int(N))
     return I
@@ -29,12 +28,57 @@ def NIntTrapz2D(func, x0, x1, y0, y1, N, M):
     I = engine.NIntTrapz2D(ctypes.c_double(x0), ctypes.c_double(x1), c_y_lb, c_y_ub, c_F, ctypes.c_int(N), ctypes.c_int(M))
     return I
 
+def NIntTrapz3D(func, x0, x1, y0, y1, z0, z1, N, M, L):
+    dx = (x1 - x0)/N
+    c_F = (ctypes.POINTER(ctypes.POINTER(ctypes.c_double)) * (N+1))()
+    c_y_lb = (ctypes.c_double * (N+1))()
+    c_y_ub = (ctypes.c_double * (N+1))()
+    c_z_lb = (ctypes.POINTER(ctypes.c_double) * (N+1))()
+    c_z_ub = (ctypes.POINTER(ctypes.c_double) * (N+1))()
+    for i in range(N+1):
+        x = x0 + i*dx
+        c_y_lb[i] = y0(x)
+        c_y_ub[i] = y1(x)
+        dy = (c_y_ub[i] - c_y_lb[i])/M
+        c_F[i] = (ctypes.POINTER(ctypes.c_double) * (M+1))()
+        c_z_lb[i] = (ctypes.c_double * (M+1))()
+        c_z_ub[i] = (ctypes.c_double * (M+1))()
+        for j in range(M+1):
+            y = c_y_lb[i] + j*dy
+            c_z_lb[i][j] = z0(x,y)
+            c_z_ub[i][j] = z1(x,y)
+            dz = (c_z_ub[i][j] - c_z_lb[i][j])/L
+            c_F[i][j] = (ctypes.c_double * (L+1))(*[func(x,y,c_z_lb[i][j]+k*dz) for k in range(L+1)])
+    engine.NIntTrapz3D.restype = ctypes.c_double
+    I = engine.NIntTrapz3D(ctypes.c_double(x0), ctypes.c_double(x1), c_y_lb, c_y_ub, c_z_lb, c_z_ub, c_F, ctypes.c_int(N), ctypes.c_int(M), ctypes.c_int(L))
+    return I
 
 def PyNIntTrapz(func, x0, x1, N):
     dx = (x1 - x0)/N
     I = 0
+    F = [func(x0 + i*dx) for i in range(N+1)]
+    for i in range(N):
+        I += dx * (F[i] + F[i+1])/2
+    return I
+
+def PyNIntTrapz2D(func, x0, x1, y0, y1, N, M):
+    dx = (x1 - x0)/N
+    I = 0
+    F = []
+    y_0 = []
+    y_1 = []
+    dy = []
     for i in range(N+1):
-        I += dx * (func(x0+dx*i) + func(x0+dx*(i+1)))/2
+        F.append([])
+        x = x0 + i*dx
+        y_0.append(y0(x))
+        y_1.append(y1(x))
+        dy.append((y_1[i] - y_0[i])/M)
+        for j in range(M+1):
+            F[i].append(func(x, y_0[i] + j*dy[i]))
+    for i in range(N):
+        for j in range(M):
+            I += dx*dy[i]*(F[i][j] + F[i+1][j] + F[i][j+1] + F[i+1][j+1])/4
     return I
 
 # Testing
@@ -42,28 +86,53 @@ def test_func1():
     func = lambda x: math.exp(-x**2/2) * math.sin(math.sqrt(x))
     N = 1000000
 
-    print('1. C++')
+    print('1) C')
     t1 = time.time()
     print(NIntTrapz(func,0,1,N))
     t2 = time.time()
     print('Time taken = ' + str(t2-t1) + ' seconds')
 
-    print('2. Py')
+    print('2) Py')
     t1 = time.time()
     print(PyNIntTrapz(func,0,1,N))
     t2 = time.time()
     print('Time taken = ' + str(t2-t1) + ' seconds')
 
-def main():
+def test_func2():
     func = lambda x, y: math.cos(x**2 * y) * math.exp(-(x**2 + y**2)/4)
     x0 = 0
     x1 = 1
     y0 = lambda x: x
     y1 = lambda x: 2*x
-    N = 1000
-    M = 1000
+    N = 2000
+    M = 2000
+    # C
+    print('1) C Code')
+    t1 = time.time()
     I = NIntTrapz2D(func, x0, x1, y0, y1, N, M)
+    t2 = time.time()
     print(I)
+    print('Time taken = ' + str(t2-t1) + ' seconds')
+    # Py
+    print('2) Py Code')
+    t1 = time.time()
+    I = PyNIntTrapz2D(func, x0, x1, y0, y1, N, M)
+    t2 = time.time()
+    print(I)
+    print('Time taken = ' + str(t2-t1) + ' seconds')
+
+def main():
+    func = lambda x, y, z: math.sin(x**2 * y * z) * math.sqrt(x**2 + y**2 + z**2)
+    x0 = 0
+    x1 = 1
+    y0 = lambda x: 0.1*x
+    y1 = lambda x: 0.7*x
+    z0 = lambda x, y: x - y
+    z1 = lambda x, y: x + y
+    N = 100
+    M = 100
+    L = 100
+    print(NIntTrapz3D(func, x0, x1, y0, y1, z0, z1, N, M, L))
 
 if __name__ == '__main__':
     main()

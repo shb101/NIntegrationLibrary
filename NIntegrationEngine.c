@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+// Author: Shobhit Bhatnagar
+// Date: 31/03/2021
+
 // 1D Numerical Integration with the Trapezoidal Rule
 __declspec(dllexport) double NIntTrapz(double x0, double x1, double* F, int N) {
 	int i;
@@ -27,12 +30,13 @@ __declspec(dllexport) double NIntSimpson(double x0, double x1, double* F, int N)
 // 2D Numerical Integration with the Trapezoidal Rule
 __declspec(dllexport) double NIntTrapz2D(double x0, double x1, double* y0, double* y1, double** F, int N, int M) {
 	int i, j;
-	double I, dx = (x1 - x0) / N, dy;
+	double I, dx = (x1 - x0) / N, dy, dA;
 	I = 0;
 	for (i = 0; i < N; i++) {
 		dy = (y1[i] - y0[i]) / M;
+		dA = dy * dx;
 		for (j = 0; j < M; j++) {
-			I += dx * dy * (F[i][j] + F[i + 1][j] + F[i][j+1] + F[i + 1][j+1]) / 4;
+			I += dA * (F[i][j] + F[i + 1][j] + F[i][j+1] + F[i + 1][j+1]) / 4;
 		}
 	}
 	return I;
@@ -41,14 +45,15 @@ __declspec(dllexport) double NIntTrapz2D(double x0, double x1, double* y0, doubl
 // 3D Numerical Integration with the Trapezoidal Rule
 __declspec(dllexport) double NIntTrapz3D(double x0, double x1, double* y0, double* y1, double** z0, double** z1, double*** F, int N, int M, int L) {
 	int i, j, k;
-	double I, dx = (x1 - x0) / N, dy, dz;
+	double I, dx = (x1 - x0) / N, dy, dz, dV;
 	I = 0;
 	for (i = 0; i < N; i++) {
 		dy = (y1[i] - y0[i]) / M;
 		for (j = 0; j < M; j++) {
 			dz = (z1[i][j] - z0[i][j]) / L;
+			dV = dx * dy * dz;
 			for (k = 0; k < L; k++)
-				I += dx * dy * dz * (F[i][j][k] + F[i + 1][j][k] + F[i][j + 1][k] + F[i + 1][j + 1][k]
+				I += dV * (F[i][j][k] + F[i + 1][j][k] + F[i][j + 1][k] + F[i + 1][j + 1][k]
 					+ F[i][j][k + 1] + F[i + 1][j][k + 1] + F[i][j + 1][k + 1] + F[i + 1][j + 1][k + 1]) / 8;
 		}
 	}
