@@ -2,15 +2,25 @@ import ctypes
 import math
 import time
 
+# Load the numerical integration engine:
 engine = ctypes.cdll.LoadLibrary('NIntegrationEngine.dll')
+# Settings
+engine.NIntTrapz.restype = ctypes.c_double
+engine.NIntTrapz2D.restype = ctypes.c_double
+engine.NIntTrapz3D.restype = ctypes.c_double
+engine.NIntSimpson.restype = ctypes.c_double
 
-def NIntTrapz(func, x0, x1, N):
+# 1D Integration with Trapezoidal Rule
+def NInt(func, x0, x1, N, method='trapz'):
     dx = (x1-x0)/N
     c_F = (ctypes.c_double * (N+1))(*[func(x0+i*dx) for i in range(N+1)])
-    engine.NIntTrapz.restype = ctypes.c_double
-    I = engine.NIntTrapz(ctypes.c_double(x0), ctypes.c_double(x1), c_F, ctypes.c_int(N))
+    if method == 'trapz':
+        I = engine.NIntTrapz(ctypes.c_double(x0), ctypes.c_double(x1), c_F, ctypes.c_int(N))
+    elif method == 'simpson':
+        I = engine.NIntSimpson(ctypes.c_double(x0), ctypes.c_double(x1), c_F, ctypes.c_int(N))
     return I
 
+# 2D Integration with Trapezoidal Rule
 def NIntTrapz2D(func, x0, x1, y0, y1, N, M):
     dx = (x1 - x0)/N
     c_F = (ctypes.POINTER(ctypes.c_double) * (N+1))()
@@ -24,10 +34,10 @@ def NIntTrapz2D(func, x0, x1, y0, y1, N, M):
         c_y_ub[i] = ub
         dy = (ub - lb)/M
         c_F[i] = (ctypes.c_double * (M+1))(*[func(x, lb+dy*j) for j in range(M+1)])
-    engine.NIntTrapz2D.restype = ctypes.c_double
     I = engine.NIntTrapz2D(ctypes.c_double(x0), ctypes.c_double(x1), c_y_lb, c_y_ub, c_F, ctypes.c_int(N), ctypes.c_int(M))
     return I
 
+# 3D Integration with Trapezoidal Rule
 def NIntTrapz3D(func, x0, x1, y0, y1, z0, z1, N, M, L):
     dx = (x1 - x0)/N
     c_F = (ctypes.POINTER(ctypes.POINTER(ctypes.c_double)) * (N+1))()
@@ -49,7 +59,6 @@ def NIntTrapz3D(func, x0, x1, y0, y1, z0, z1, N, M, L):
             c_z_ub[i][j] = z1(x,y)
             dz = (c_z_ub[i][j] - c_z_lb[i][j])/L
             c_F[i][j] = (ctypes.c_double * (L+1))(*[func(x,y,c_z_lb[i][j]+k*dz) for k in range(L+1)])
-    engine.NIntTrapz3D.restype = ctypes.c_double
     I = engine.NIntTrapz3D(ctypes.c_double(x0), ctypes.c_double(x1), c_y_lb, c_y_ub, c_z_lb, c_z_ub, c_F, ctypes.c_int(N), ctypes.c_int(M), ctypes.c_int(L))
     return I
 
@@ -88,7 +97,7 @@ def test_func1():
 
     print('1) C')
     t1 = time.time()
-    print(NIntTrapz(func,0,1,N))
+    print(NInt(func,0,1,N, method='simpson'))
     t2 = time.time()
     print('Time taken = ' + str(t2-t1) + ' seconds')
 
@@ -135,4 +144,4 @@ def main():
     print(NIntTrapz3D(func, x0, x1, y0, y1, z0, z1, N, M, L))
 
 if __name__ == '__main__':
-    main()
+    test_func1()
