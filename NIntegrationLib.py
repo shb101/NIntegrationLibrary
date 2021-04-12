@@ -17,8 +17,10 @@ engine.NIntSimpson3D.restype = ctypes.c_double
 def NInt(func, x0, x1, N, method='trapz'):
     dx = (x1-x0)/N
     c_F = (ctypes.c_double * (N+1))()
+    x = x0
     for i in range(N+1):
-        c_F[i] = func(x0 + i*dx)
+        c_F[i] = func(x)
+        x += dx
     if method == 'trapz':
         I = engine.NIntTrapz(ctypes.c_double(x0), ctypes.c_double(x1), c_F, ctypes.c_int(N))
     elif method == 'simpson':
@@ -31,16 +33,19 @@ def NInt2D(func, x0, x1, y0, y1, N, M, method='trapz'):
     c_F = (ctypes.POINTER(ctypes.c_double) * (N+1))()
     c_y_lb = (ctypes.c_double * (N+1))()
     c_y_ub = (ctypes.c_double * (N+1))()
+    x = x0
     for i in range(N+1):
-        x = x0 + i*dx
         lb = y0(x)
         ub = y1(x)
         c_y_lb[i] = lb
         c_y_ub[i] = ub
         dy = (ub - lb)/M
         c_F[i] = (ctypes.c_double * (M+1))()
+        y = lb
         for j in range(M+1):
-            c_F[i][j] = func(x, lb + j*dy)
+            c_F[i][j] = func(x, y)
+            y += dy
+        x += dx
     if method == 'trapz':
         I = engine.NIntTrapz2D(ctypes.c_double(x0), ctypes.c_double(x1), c_y_lb, c_y_ub, c_F, ctypes.c_int(N), ctypes.c_int(M))
     elif method == 'simpson':
@@ -55,22 +60,26 @@ def NInt3D(func, x0, x1, y0, y1, z0, z1, N, M, L, method='trapz'):
     c_y_ub = (ctypes.c_double * (N+1))()
     c_z_lb = (ctypes.POINTER(ctypes.c_double) * (N+1))()
     c_z_ub = (ctypes.POINTER(ctypes.c_double) * (N+1))()
+    x = x0
     for i in range(N+1):
-        x = x0 + i*dx
         c_y_lb[i] = y0(x)
         c_y_ub[i] = y1(x)
         dy = (c_y_ub[i] - c_y_lb[i])/M
         c_F[i] = (ctypes.POINTER(ctypes.c_double) * (M+1))()
         c_z_lb[i] = (ctypes.c_double * (M+1))()
         c_z_ub[i] = (ctypes.c_double * (M+1))()
+        y = c_y_lb[i]
         for j in range(M+1):
-            y = c_y_lb[i] + j*dy
             c_z_lb[i][j] = z0(x,y)
             c_z_ub[i][j] = z1(x,y)
             dz = (c_z_ub[i][j] - c_z_lb[i][j])/L
             c_F[i][j] = (ctypes.c_double * (L+1))()
+            z = c_z_lb[i][j]
             for k in range(L+1):
-                c_F[i][j][k] = func(x,y,c_z_lb[i][j]+k*dz)
+                c_F[i][j][k] = func(x,y,z)
+                z += dz
+            y += dy
+        x += dx
     if method == 'trapz':
         I = engine.NIntTrapz3D(ctypes.c_double(x0), ctypes.c_double(x1), c_y_lb, c_y_ub, c_z_lb, c_z_ub, c_F, ctypes.c_int(N), ctypes.c_int(M), ctypes.c_int(L))
     elif method == 'simpson':
@@ -123,13 +132,14 @@ def test_func1():
     print('Time taken = ' + str(t2-t1) + ' seconds')
 
 def test_func2():
+    # https://www.wolframalpha.com/input/?i=integral+0+to+1+integral+x+to+2*x+cos%28x%5E2*y%29*exp%28-%28x%5E2%2By%5E2%29%2F4%29+dy+dx
     func = lambda x, y: math.cos(x**2 * y) * math.exp(-(x**2 + y**2)/4)
     x0 = 0
     x1 = 1
     y0 = lambda x: x
     y1 = lambda x: 2*x
-    N = 4000
-    M = 4000
+    N = 2000
+    M = 2000
     # C
     print('1) C Code')
     t1 = time.time()
@@ -146,6 +156,7 @@ def test_func2():
     print('Time taken = ' + str(t2-t1) + ' seconds')
 
 def main():
+    # https://www.wolframalpha.com/input/?i=integral+0+to+1+integral+0.1*x+to+0.7*x+integral+%28x-y+to+x%2By%29+sin%28x%5E2*y*z%29+*+sqrt%28x%5E2+%2B+y%5E2+%2B+z%5E2%29+dz+dy+dx
     func = lambda x, y, z: math.sin(x**2 * y * z) * math.sqrt(x**2 + y**2 + z**2)
     x0 = 0
     x1 = 1
@@ -156,7 +167,8 @@ def main():
     N = 100
     M = 100
     L = 100
-    print(NInt3D(func, x0, x1, y0, y1, z0, z1, N, M, L))
+    print(NInt3D(func, x0, x1, y0, y1, z0, z1, N, M, L, method='simpson'))
 
 if __name__ == '__main__':
-    test_func2()
+    test_func1()
+    #main()
