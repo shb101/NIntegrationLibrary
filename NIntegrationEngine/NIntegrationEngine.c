@@ -2,7 +2,7 @@
 #include <stdlib.h>
 
 // Author: Shobhit Bhatnagar
-// Date: 31/03/2021
+// Date: 12/04/2021
 
 // 1D Numerical Integration with the Trapezoidal Rule
 __declspec(dllexport) double NIntTrapz(double x0, double x1, double* F, int N) {
@@ -57,5 +57,36 @@ __declspec(dllexport) double NIntTrapz3D(double x0, double x1, double* y0, doubl
 					+ F[i][j][k + 1] + F[i + 1][j][k + 1] + F[i][j + 1][k + 1] + F[i + 1][j + 1][k + 1]) / 8;
 		}
 	}
+	return I;
+}
+
+// 2D Numerical Integration with the Simpson's Rule
+__declspec(dllexport) double NIntSimpson2D(double x0, double x1, double* y0, double* y1, double** F, int N, int M) {
+	int i;
+	double I, * I1;
+	I1 = (double*)malloc((N + 1) * sizeof(double));
+	for (i = 0; i <= N; i++) {
+		I1[i] = NIntSimpson(y0[i], y1[i], F[i], M);
+	}
+	I = NIntSimpson(x0, x1, I1, N);
+	free(I1);
+	return I;
+}
+
+// 3D Numerical Integration with Simpson's Rule
+__declspec(dllexport) double NIntSimpson3D(double x0, double x1, double* y0, double* y1, double** z0, double** z1, double*** F, int N, int M, int L) {
+	int i, j;
+	double I, * I2, * I1;
+	I2 = (double*)malloc((N + 1) * sizeof(double));
+	I1 = (double*)malloc((M + 1) * sizeof(double));
+	for (i = 0; i <= N; i++) {
+		for (j = 0; j <= M; j++) {
+			I1[j] = NIntSimpson(z0[i][j], z1[i][j], F[i][j], L);
+		}
+		I2[i] = NIntSimpson(y0[i], y1[i], I1, M);
+	}
+	I = NIntSimpson(x0, x1, I2, N);
+	free(I2);
+	free(I1);
 	return I;
 }
